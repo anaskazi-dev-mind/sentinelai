@@ -1,0 +1,35 @@
+# ===== Core Framework =====
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# ===== Database / ORM =====
+sqlalchemy==2.0.36
+
+# ===== Validation / Settings =====
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# ===== Auth / Security =====
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.19
+cryptography==43.0.3
+
+# ===== Machine Learning (all 10 course modules) =====
+scikit-learn==1.5.2
+joblib==1.4.2
+numpy==2.1.3
+pandas==2.2.3
+
+# ===== Automation: Scheduled Backup / Log Scanning =====
+apscheduler==3.10.4
+
+# ===== AI Chatbot (natural language query interface) =====
+anthropic==0.40.0
+
+# ===== Config =====
+python-dotenv==1.0.1
+
+# ===== Testing =====
+pytest==8.3.4
+httpx==0.28.1
