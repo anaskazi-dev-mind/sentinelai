@@ -1,0 +1,49 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===== Environment / secrets =====
+.env
+.env.local
+*.pem
+*.key
+
+# ===== Database =====
+*.db
+*.sqlite3
+backend/app/data/
+
+# ===== ML model artifacts (generated, not source) =====
+backend/app/ml/saved_models/*.joblib
+backend/app/ml/saved_models/*.pkl
+
+# ===== Backups & logs (runtime-generated) =====
+backend/backups/
+backend/logs/
+*.log
+
+# ===== Node / Frontend =====
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/build/
+
+# ===== IDE / OS =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ===== Misc =====
+*.zip
+*.tar.gz
