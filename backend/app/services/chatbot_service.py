@@ -3,14 +3,11 @@ chatbot_service.py
 --------------------
 Automation module: Chatbot.
 
-This is the natural-language "copilot" layer -- it does NOT reinvent
-security logic. It pulls real, live numbers from the database (event
-counts, severity breakdown, recent critical events, cluster summary),
-hands them to Claude as grounded context, and asks it to answer strictly
-from that data. This mirrors the course's chatbot module ("designing
-conversational flow", "training chatbot responses") but implemented with
-a real LLM backend instead of a scripted rule-based bot -- a legitimate,
-more capable evolution of the same concept.
+Powered by Google's Gemini API (free tier) instead of a scripted
+rule-based bot. Pulls real, live numbers from the database (event
+counts, severity breakdown, recent critical events) and hands them to
+Gemini as grounded context, instructing it to answer strictly from that
+data -- a retrieval-augmented pattern, not open-ended generation.
 
 Conversation history is persisted in ChatMessage so the copilot has
 short-term memory across turns, and so the report can show a real
@@ -19,7 +16,8 @@ transcript as evidence of a working feature.
 
 from __future__ import annotations
 
-from anthropic import Anthropic
+from google import genai
+from google.genai import types
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -28,7 +26,7 @@ from app.models import ChatMessage, Event, SeverityLevel
 
 settings = get_settings()
 
-MODEL = "claude-sonnet-5"
+MODEL = "gemini-2.5-flash"
 MAX_HISTORY_MESSAGES = 10
 MAX_RECENT_EVENTS_IN_CONTEXT = 8
 
@@ -50,11 +48,11 @@ Rules you must follow strictly:
 """
 
 
-def _get_client() -> Anthropic:
-    api_key = settings.anthropic_api_key
+def _get_client() -> genai.Client:
+    api_key = settings.gemini_api_key
     if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to backend/.env.")
-    return Anthropic(api_key=api_key)
+        raise RuntimeError("GEMINI_API_KEY is not set. Add it to backend/.env.")
+    return genai.Client(api_key=api_key)
 
 
 def _build_security_context(db: Session) -> str:
@@ -100,6 +98,11 @@ def _build_security_context(db: Session) -> str:
 
 
 def _get_recent_history(db: Session, user_id: str | None) -> list[dict]:
+    """
+    Returns recent turns in Gemini's expected format. Note: Gemini uses
+    the role "model" for assistant turns (not "assistant" like other
+    APIs) -- this mapping is what makes our stored history compatible.
+    """
     query = db.query(ChatMessage).order_by(ChatMessage.created_at.desc())
     if user_id:
         query = query.filter(ChatMessage.user_id == user_id)
@@ -107,13 +110,17 @@ def _get_recent_history(db: Session, user_id: str | None) -> list[dict]:
     recent = query.limit(MAX_HISTORY_MESSAGES).all()
     recent.reverse()  # chronological order for the API call
 
-    return [{"role": m.role, "content": m.content} for m in recent]
+    gemini_role = {"user": "user", "assistant": "model"}
+    return [
+        {"role": gemini_role.get(m.role, "user"), "parts": [{"text": m.content}]}
+        for m in recent
+    ]
 
 
 def ask_copilot(db: Session, message: str, user_id: str | None = None) -> str:
     """
     Full round-trip: store the user's message, gather grounded context,
-    call Claude with conversation history, store and return the reply.
+    call Gemini with conversation history, store and return the reply.
     """
     user_msg = ChatMessage(user_id=user_id, role="user", content=message)
     db.add(user_msg)
@@ -122,23 +129,23 @@ def ask_copilot(db: Session, message: str, user_id: str | None = None) -> str:
     history = _get_recent_history(db, user_id)
     security_context = _build_security_context(db)
 
-    messages = history[:-1] + [
-        {
-            "role": "user",
-            "content": f"SECURITY DATA CONTEXT:\n{security_context}\n\nUSER QUESTION: {message}",
-        }
-    ]
+    # The last history entry is the message we just stored -- replace it
+    # with a version that also carries the grounded security context.
+    grounded_message = (
+        f"SECURITY DATA CONTEXT:\n{security_context}\n\nUSER QUESTION: {message}"
+    )
+    contents = history[:-1] + [{"role": "user", "parts": [{"text": grounded_message}]}]
 
     client = _get_client()
-    response = client.messages.create(
+    response = client.models.generate_content(
         model=MODEL,
-        max_tokens=800,
-        system=SYSTEM_PROMPT,
-        messages=messages,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            max_output_tokens=800,
+        ),
     )
-    reply_text = "".join(
-        block.text for block in response.content if block.type == "text"
-    )
+    reply_text = response.text or "I couldn't generate a response -- please try again."
 
     assistant_msg = ChatMessage(user_id=user_id, role="assistant", content=reply_text)
     db.add(assistant_msg)
