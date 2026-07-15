@@ -14,6 +14,16 @@
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 const TOKEN_KEY = "sentinelai_token";
+const SESSION_KEY = "sentinelai_session_id";
+
+function getSessionId() {
+  let sessionId = localStorage.getItem(SESSION_KEY);
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem(SESSION_KEY, sessionId);
+  }
+  return sessionId;
+}
 
 // =====================================================================
 // Token storage
@@ -44,8 +54,8 @@ class ApiError extends Error {
   }
 }
 
-async function request(path, { method = "GET", body, auth = false, isForm = false } = {}) {
-  const headers = {};
+async function request(path, { method = "GET", body, auth = false, isForm = false, extraHeaders = {} } = {}) {
+  const headers = { ...extraHeaders };
   if (!isForm) headers["Content-Type"] = "application/json";
 
   if (auth) {
@@ -114,6 +124,8 @@ export const events = {
 
   triggerScan: () => request("/events/scan", { method: "POST" }),
 
+  classify: (message) => request("/events/classify", { method: "POST", body: { message } }),
+
   riskTrend: (hoursBack = 6) => request(`/events/analytics/risk-trend?hours_back=${hoursBack}`),
 
   clusters: () => request("/events/analytics/clusters"),
@@ -140,9 +152,19 @@ export const files = {
 // =====================================================================
 
 export const chat = {
-  send: (message) => request("/chat", { method: "POST", body: { message }, auth: true }),
+  send: (message) =>
+    request("/chat", {
+      method: "POST",
+      body: { message },
+      auth: true,
+      extraHeaders: { "X-Session-Id": getSessionId() },
+    }),
 
-  history: (limit = 50) => request(`/chat/history?limit=${limit}`, { auth: true }),
+  history: (limit = 50) =>
+    request(`/chat/history?limit=${limit}`, {
+      auth: true,
+      extraHeaders: { "X-Session-Id": getSessionId() },
+    }),
 };
 
 export { ApiError };

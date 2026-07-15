@@ -19,6 +19,7 @@ from app.models import SeverityLevel
 # Auth
 # =====================================================================
 
+
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     email: EmailStr
@@ -48,11 +49,19 @@ class Token(BaseModel):
 # Events (log monitoring + ML classification results)
 # =====================================================================
 
+
 class EventIngest(BaseModel):
     """What the log-monitoring service submits for a freshly observed event."""
+
     source: str = Field(description="e.g. 'log_monitor' or 'file_scan'")
     raw_message: str
     file_path: str | None = None
+
+
+class ManualEventRequest(BaseModel):
+    """A log-style line typed by a person to test the classifier live."""
+
+    message: str = Field(min_length=5, max_length=500)
 
 
 class EventOut(BaseModel):
@@ -77,6 +86,7 @@ class EventListResponse(BaseModel):
 
 class RiskTrendPoint(BaseModel):
     """One point on the risk-over-time chart (Linear Regression forecast)."""
+
     timestamp: datetime
     actual_risk: float
     predicted_risk: float | None = None
@@ -89,6 +99,7 @@ class RiskTrendResponse(BaseModel):
 
 class ClusterSummary(BaseModel):
     """One K-Means cluster, summarized for the dashboard's cluster view."""
+
     cluster_id: int
     event_count: int
     dominant_severity: SeverityLevel
@@ -98,6 +109,7 @@ class ClusterSummary(BaseModel):
 # =====================================================================
 # Files (backup + encryption pipeline)
 # =====================================================================
+
 
 class FileRecordOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -120,6 +132,7 @@ class FileActionRequest(BaseModel):
 # =====================================================================
 # Chat (natural-language copilot)
 # =====================================================================
+
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)

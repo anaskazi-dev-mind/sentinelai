@@ -121,6 +121,9 @@ class ChatMessage(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    session_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
 
     role: Mapped[str] = mapped_column(
         String(16), nullable=False

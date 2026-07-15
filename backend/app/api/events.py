@@ -30,10 +30,11 @@ from app.schemas import (
     ClusterSummary,
     EventListResponse,
     EventOut,
+    ManualEventRequest,
     RiskTrendPoint,
     RiskTrendResponse,
 )
-from app.services.log_ingestion_service import scan_and_ingest
+from app.services.log_ingestion_service import ingest_message, scan_and_ingest
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -77,6 +78,19 @@ def trigger_scan(db: Session = Depends(get_db)) -> dict:
     """
     ingested = scan_and_ingest(db)
     return {"ingested_events": ingested}
+
+
+@router.post("/classify", response_model=EventOut, status_code=201)
+def classify_manual_event(
+    payload: ManualEventRequest, db: Session = Depends(get_db)
+) -> Event:
+    """
+    Lets anyone type or paste an arbitrary log-style line and see it
+    classified live through the exact same ML pipeline the automated
+    scheduler uses -- a hands-on way to demonstrate the classifier
+    instead of only watching simulated background activity.
+    """
+    return ingest_message(db, source="manual_input", raw_message=payload.message)
 
 
 @router.get("/analytics/risk-trend", response_model=RiskTrendResponse)

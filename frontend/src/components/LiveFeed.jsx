@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { RefreshCw, FileText, Terminal } from "lucide-react";
+import { RefreshCw, FileText, Terminal, Sparkles } from "lucide-react";
 import { events, ApiError } from "../api";
 
 const SEVERITY_STYLES = {
-  normal: { dot: "bg-severity-normal", text: "text-severity-normal" },
-  suspicious: { dot: "bg-severity-suspicious", text: "text-severity-suspicious" },
-  critical: { dot: "bg-severity-critical", text: "text-severity-critical" },
+  normal: { dot: "bg-severity-normal", text: "text-severity-normal", border: "border-severity-normal/40", bg: "bg-severity-normal/10" },
+  suspicious: { dot: "bg-severity-suspicious", text: "text-severity-suspicious", border: "border-severity-suspicious/40", bg: "bg-severity-suspicious/10" },
+  critical: { dot: "bg-severity-critical", text: "text-severity-critical", border: "border-severity-critical/40", bg: "bg-severity-critical/10" },
 };
 
 const POLL_INTERVAL_MS = 5000;
+const EXAMPLE_PLACEHOLDER =
+  "e.g. Login node UNKNOWN-HOST: 6 failed attempts, 15 active connections, 20 file operations in session (after-hours=yes).";
 
 function formatTime(isoString) {
   return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -49,9 +51,86 @@ function EventRow({ event }) {
           )}
           <span className="shrink-0">risk {event.risk_score.toFixed(0)}</span>
           <span className="shrink-0 text-ink-muted">· {event.model_used}</span>
+          {event.source === "manual_input" && (
+            <span className="shrink-0 text-severity-suspicious">· manual test</span>
+          )}
         </div>
       </div>
     </motion.li>
+  );
+}
+
+function ManualClassifier({ onClassified }) {
+  const [input, setInput] = useState("");
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || busy) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const event = await events.classify(text);
+      setResult(event);
+      setInput("");
+      onClassified?.();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Classification failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const style = result ? SEVERITY_STYLES[result.severity] || SEVERITY_STYLES.normal : null;
+
+  return (
+    <div className="px-4 py-3 border-b border-border-subtle">
+      <div className="flex items-center gap-1.5 mb-2">
+        <Sparkles size={13} className="text-severity-suspicious" />
+        <span className="text-xs font-semibold text-ink-secondary">Try the classifier live</span>
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={EXAMPLE_PLACEHOLDER}
+          className="flex-1 bg-surface-raised border border-border rounded-lg px-3 py-1.5 text-xs font-mono text-ink-primary placeholder:text-ink-muted focus:outline-none focus:ring-1 focus:ring-severity-suspicious"
+        />
+        <button
+          type="submit"
+          disabled={busy || !input.trim()}
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-severity-suspicious text-void hover:brightness-110 transition-all disabled:opacity-40 shrink-0"
+        >
+          {busy ? "…" : "Classify"}
+        </button>
+      </form>
+
+      <p className="mt-1.5 text-[11px] text-ink-muted">
+        Tip: include numbers (failed attempts, connections, file ops) for the most accurate result.
+      </p>
+
+      {error && <p className="mt-1.5 text-xs text-severity-critical">{error}</p>}
+
+      {result && style && (
+        <div className={`mt-2 px-3 py-2 rounded-lg border ${style.border} ${style.bg}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-xs font-semibold uppercase tracking-wide ${style.text}`}>
+              {result.severity}
+            </span>
+            <span className="text-xs text-ink-secondary">risk {result.risk_score.toFixed(0)}</span>
+          </div>
+          {result.explanation && (
+            <p className="mt-1 text-[11px] text-ink-secondary leading-snug">{result.explanation}</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -94,7 +173,7 @@ export default function LiveFeed() {
 
   return (
     <div className="panel flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle shrink-0">
         <div className="flex items-center gap-2">
           <Terminal size={16} className="text-ink-secondary" />
           <h2 className="font-display text-sm font-semibold text-ink-primary">Live Feed</h2>
@@ -109,8 +188,12 @@ export default function LiveFeed() {
         </button>
       </div>
 
+      <div className="shrink-0">
+        <ManualClassifier onClassified={fetchEvents} />
+      </div>
+
       {error && (
-        <div className="px-4 py-2 text-xs text-severity-critical bg-severity-critical/10 border-b border-border-subtle">
+        <div className="px-4 py-2 text-xs text-severity-critical bg-severity-critical/10 border-b border-border-subtle shrink-0">
           {error}
         </div>
       )}

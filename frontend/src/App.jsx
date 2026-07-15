@@ -228,8 +228,8 @@ export default function App() {
   const risk = useSystemRisk();
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
+    <div className="h-screen flex flex-col overflow-hidden">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-border-subtle shrink-0">
         <div className="flex items-center gap-2.5">
           <Shield size={20} className="text-severity-suspicious" />
           <span className="font-display text-lg font-semibold text-ink-primary">SentinelAI</span>
@@ -242,27 +242,29 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 p-4 grid grid-cols-1 xl:grid-cols-12 gap-4">
-        <section className="xl:col-span-4 h-[560px] xl:h-auto">
-          <LiveFeed />
-        </section>
+      <main className="flex-1 min-h-0 flex flex-col gap-4 p-4 overflow-hidden">
+        <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-12 xl:grid-rows-[minmax(0,1fr)] gap-4">
+          <section className="h-[560px] xl:h-full xl:col-span-4 min-h-0">
+            <LiveFeed />
+          </section>
 
-        <section className="xl:col-span-5 flex flex-col gap-4">
-          <div className="h-[270px]">
-            <RiskChart />
-          </div>
-          <div className="h-[270px]">
-            <ClusterView />
-          </div>
-        </section>
+          <section className="xl:col-span-5 min-h-0 flex flex-col gap-4 h-[560px] xl:h-full">
+            <div className="flex-1 min-h-0">
+              <RiskChart />
+            </div>
+            <div className="flex-1 min-h-0">
+              <ClusterView />
+            </div>
+          </section>
 
-        <section className="xl:col-span-3 h-[560px] xl:h-auto">
-          <ChatPanel />
-        </section>
+          <section className="h-[560px] xl:h-full xl:col-span-3 min-h-0">
+            <ChatPanel />
+          </section>
+        </div>
 
-        <section className="xl:col-span-12 h-[240px]">
+        <div className="h-[180px] shrink-0">
           <FileVault />
-        </section>
+        </div>
       </main>
     </div>
   );

@@ -3,15 +3,11 @@ chatbot_service.py
 --------------------
 Automation module: Chatbot.
 
-Powered by Google's Gemini API (free tier) instead of a scripted
-rule-based bot. Pulls real, live numbers from the database (event
-counts, severity breakdown, recent critical events) and hands them to
-Gemini as grounded context, instructing it to answer strictly from that
-data -- a retrieval-augmented pattern, not open-ended generation.
-
-Conversation history is persisted in ChatMessage so the copilot has
-short-term memory across turns, and so the report can show a real
-transcript as evidence of a working feature.
+Powered by Google's Gemini API. Pulls real, live numbers from the
+database and hands them to Gemini as grounded context. Anonymous
+visitors are scoped by a browser-generated session_id (instead of a
+real user_id) so two different visitors never see each other's
+conversation history.
 """
 
 from __future__ import annotations
@@ -26,7 +22,11 @@ from app.models import ChatMessage, Event, SeverityLevel
 
 settings = get_settings()
 
-MODEL = "gemini-2.5-flash"
+# Ordered by preference. If the primary model gets deprecated or removed
+# (which has happened with little notice on this API before), the
+# service automatically falls back to the next one instead of failing.
+CANDIDATE_MODELS = ["gemini-3.1-flash-lite", "gemini-3-flash-preview"]
+
 MAX_HISTORY_MESSAGES = 10
 MAX_RECENT_EVENTS_IN_CONTEXT = 8
 
@@ -56,10 +56,6 @@ def _get_client() -> genai.Client:
 
 
 def _build_security_context(db: Session) -> str:
-    """
-    Pulls a real, current snapshot of the system's security state --
-    this is what makes the copilot's answers grounded instead of generic.
-    """
     total_events = db.query(func.count(Event.id)).scalar() or 0
 
     severity_counts = dict(
@@ -97,18 +93,24 @@ def _build_security_context(db: Session) -> str:
     )
 
 
-def _get_recent_history(db: Session, user_id: str | None) -> list[dict]:
+def _get_recent_history(
+    db: Session, user_id: str | None, session_id: str | None
+) -> list[dict]:
     """
-    Returns recent turns in Gemini's expected format. Note: Gemini uses
-    the role "model" for assistant turns (not "assistant" like other
-    APIs) -- this mapping is what makes our stored history compatible.
+    Logged-in users are scoped by user_id; anonymous visitors are scoped
+    by their browser-generated session_id instead, so two different
+    anonymous visitors never see each other's conversation.
     """
     query = db.query(ChatMessage).order_by(ChatMessage.created_at.desc())
     if user_id:
         query = query.filter(ChatMessage.user_id == user_id)
+    elif session_id:
+        query = query.filter(ChatMessage.session_id == session_id)
+    else:
+        return []  # no identity at all -- nothing to scope history to
 
     recent = query.limit(MAX_HISTORY_MESSAGES).all()
-    recent.reverse()  # chronological order for the API call
+    recent.reverse()
 
     gemini_role = {"user": "user", "assistant": "model"}
     return [
@@ -117,37 +119,55 @@ def _get_recent_history(db: Session, user_id: str | None) -> list[dict]:
     ]
 
 
-def ask_copilot(db: Session, message: str, user_id: str | None = None) -> str:
-    """
-    Full round-trip: store the user's message, gather grounded context,
-    call Gemini with conversation history, store and return the reply.
-    """
-    user_msg = ChatMessage(user_id=user_id, role="user", content=message)
+def ask_copilot(
+    db: Session,
+    message: str,
+    user_id: str | None = None,
+    session_id: str | None = None,
+) -> str:
+    user_msg = ChatMessage(
+        user_id=user_id, session_id=session_id, role="user", content=message
+    )
     db.add(user_msg)
     db.commit()
 
-    history = _get_recent_history(db, user_id)
+    history = _get_recent_history(db, user_id, session_id)
     security_context = _build_security_context(db)
 
-    # The last history entry is the message we just stored -- replace it
-    # with a version that also carries the grounded security context.
     grounded_message = (
         f"SECURITY DATA CONTEXT:\n{security_context}\n\nUSER QUESTION: {message}"
     )
     contents = history[:-1] + [{"role": "user", "parts": [{"text": grounded_message}]}]
 
     client = _get_client()
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=contents,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            max_output_tokens=800,
-        ),
+    config = types.GenerateContentConfig(
+        system_instruction=SYSTEM_PROMPT,
+        max_output_tokens=800,
     )
-    reply_text = response.text or "I couldn't generate a response -- please try again."
 
-    assistant_msg = ChatMessage(user_id=user_id, role="assistant", content=reply_text)
+    reply_text = None
+    last_error = None
+    for model_name in CANDIDATE_MODELS:
+        try:
+            response = client.models.generate_content(
+                model=model_name, contents=contents, config=config
+            )
+            reply_text = (
+                response.text or "I couldn't generate a response -- please try again."
+            )
+            break
+        except genai.errors.ClientError as exc:
+            last_error = exc
+            continue
+
+    if reply_text is None:
+        raise RuntimeError(
+            f"All Gemini model candidates failed. Last error: {last_error}"
+        )
+
+    assistant_msg = ChatMessage(
+        user_id=user_id, session_id=session_id, role="assistant", content=reply_text
+    )
     db.add(assistant_msg)
     db.commit()
 
@@ -155,9 +175,16 @@ def ask_copilot(db: Session, message: str, user_id: str | None = None) -> str:
 
 
 def get_chat_history(
-    db: Session, user_id: str | None = None, limit: int = 50
+    db: Session,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    limit: int = 50,
 ) -> list[ChatMessage]:
     query = db.query(ChatMessage).order_by(ChatMessage.created_at.asc())
     if user_id:
         query = query.filter(ChatMessage.user_id == user_id)
+    elif session_id:
+        query = query.filter(ChatMessage.session_id == session_id)
+    else:
+        return []
     return query.limit(limit).all()
