@@ -8,6 +8,13 @@ const SEVERITY_STYLES = {
   critical: "bg-severity-critical/15 text-severity-critical border-severity-critical/30",
 };
 
+function cleanSampleMessage(message) {
+  // Strip a leading "[2026-07-15T...timestamp...]" prefix if present,
+  // so the truncated preview shows the meaningful part of the message
+  // instead of just the timestamp.
+  return message.replace(/^\[[\d\-T:.+]+\]\s*/, "");
+}
+
 export default function ClusterView() {
   const [clusters, setClusters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +84,7 @@ export default function ClusterView() {
               <ul className="mt-2 space-y-1">
                 {cluster.sample_messages.map((msg, i) => (
                   <li key={i} className="text-xs text-ink-muted font-mono truncate" title={msg}>
-                    {msg}
+                    {cleanSampleMessage(msg)}
                   </li>
                 ))}
               </ul>

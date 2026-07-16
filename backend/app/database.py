@@ -9,6 +9,7 @@ Postgres in production requires no code change here, only an env var.
 """
 
 from collections.abc import Generator
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -22,6 +23,12 @@ settings = get_settings()
 connect_args = (
     {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
 )
+
+# Ensure the SQLite database's parent directory exists before connecting --
+# SQLite won't create it automatically, and this avoids a startup crash.
+if settings.database_url.startswith("sqlite"):
+    db_file_path = settings.database_url.replace("sqlite:///", "", 1)
+    Path(db_file_path).parent.mkdir(parents=True, exist_ok=True)
 
 engine = create_engine(
     settings.database_url,

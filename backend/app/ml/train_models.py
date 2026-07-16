@@ -231,14 +231,7 @@ def main() -> None:
         joblib.dump(model, MODEL_DIR / f"{name}.joblib")
     joblib.dump(binary_logistic, MODEL_DIR / "logistic_binary.joblib")
     for name, model in regressors.items():
-        joblib.dump(
-            model,
-            (
-                MODEL_DIR / f"{name.replace('_regressor', '')}_regressor.joblib"
-                if False
-                else f"{name}.joblib"
-            ),
-        )
+        joblib.dump(model, MODEL_DIR / f"{name}.joblib")
     joblib.dump(kmeans, MODEL_DIR / "kmeans.joblib")
 
     (MODEL_DIR / "best_classifier.txt").write_text(best_name)

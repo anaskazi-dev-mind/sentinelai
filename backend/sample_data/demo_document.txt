@@ -1,0 +1,13 @@
+CONFIDENTIAL — Quarterly Security Review (Demo Document)
+
+This is a sample document included with SentinelAI for demonstration
+purposes. It represents the kind of sensitive file the File Vault
+module is designed to protect — internal reports, financial records,
+or other confidential material.
+
+Use this file to demonstrate the Backup and Encrypt features during
+a live presentation, since it is guaranteed to exist at a fixed path
+regardless of where the backend is deployed.
+
+Prepared for: Internal Review Board
+Classification: Internal Use Only

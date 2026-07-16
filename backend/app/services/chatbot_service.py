@@ -52,7 +52,13 @@ def _get_client() -> genai.Client:
     api_key = settings.gemini_api_key
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set. Add it to backend/.env.")
-    return genai.Client(api_key=api_key)
+    # A shorter timeout means a slow/rate-limited primary model fails fast
+    # and falls back to the next candidate quickly, instead of the copilot
+    # appearing to hang for a long time before responding.
+    return genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(timeout=12000),  # 12 seconds, in milliseconds
+    )
 
 
 def _build_security_context(db: Session) -> str:

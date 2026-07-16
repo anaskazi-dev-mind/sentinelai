@@ -1,0 +1,59 @@
+{
+  "feature_columns": [
+    "hour_of_day",
+    "failed_login_attempts",
+    "data_transfer_mb",
+    "file_access_count",
+    "network_connections",
+    "distinct_files_touched",
+    "is_after_hours",
+    "is_known_device",
+    "cpu_spike_percent"
+  ],
+  "dataset_size": 3000,
+  "train_size": 2400,
+  "test_size": 600,
+  "severity_classifiers": {
+    "knn": {
+      "accuracy": 0.95,
+      "f1_macro": 0.9056
+    },
+    "logistic_multiclass": {
+      "accuracy": 0.9667,
+      "f1_macro": 0.9397
+    },
+    "decision_tree": {
+      "accuracy": 0.9267,
+      "f1_macro": 0.8711
+    },
+    "ann": {
+      "accuracy": 0.95,
+      "f1_macro": 0.9083
+    },
+    "svm": {
+      "accuracy": 0.96,
+      "f1_macro": 0.9275
+    },
+    "random_forest": {
+      "accuracy": 0.9517,
+      "f1_macro": 0.9102
+    }
+  },
+  "best_classifier": "logistic_multiclass",
+  "binary_logistic_regression": {
+    "accuracy": 0.9867,
+    "f1": 0.9805
+  },
+  "regressors_risk_score": {
+    "knn_regressor": {
+      "mae": 4.904,
+      "r2": 0.9601
+    },
+    "linear_regression": {
+      "mae": 5.774,
+      "r2": 0.94
+    }
+  },
+  "kmeans_clusters": 4,
+  "kmeans_inertia": 10991.36
+}
